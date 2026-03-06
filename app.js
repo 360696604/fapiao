@@ -33,6 +33,7 @@ const elements = {
     fileCount: document.getElementById('file-count'),
     clearAllBtn: document.getElementById('clear-all-btn'),
     nextStep1: document.getElementById('next-step1'),
+    printfp: document.getElementById('printfp'),
     prevStep2: document.getElementById('prev-step2'),
     nextStep2: document.getElementById('next-step2'),
     restartBtn: document.getElementById('restart-btn'),
