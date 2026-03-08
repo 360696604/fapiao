@@ -36,8 +36,6 @@ const elements = {
     printfp: document.getElementById('printfp'),
     prevStep2: document.getElementById('prev-step2'),
     nextStep2: document.getElementById('next-step2'),
-    restartBtn: document.getElementById('restart-btn'),
-    downloadBtn: document.getElementById('download-btn'),
     // 预览相关元素
     previewCanvas: document.getElementById('preview-canvas'),
     previewLoading: document.getElementById('preview-loading'),
@@ -46,21 +44,13 @@ const elements = {
     currentPreviewPage: document.getElementById('current-preview-page'),
     totalPreviewPages: document.getElementById('total-preview-pages'),
     perPageCount: document.getElementById('per-page-count'),
-    totalPages: document.getElementById('total-pages'),
-    // 结果相关元素
-    processing: document.getElementById('processing'),
-    resultSuccess: document.getElementById('result-success'),
-    progressFill: document.getElementById('progress-fill'),
-    progressText: document.getElementById('progress-text'),
-    resultInvoiceCount: document.getElementById('result-invoice-count'),
-    resultPageCount: document.getElementById('result-page-count')
+    totalPages: document.getElementById('total-pages')
 };
 
 // 步骤面板
 const panels = {
     step1: document.getElementById('step1-panel'),
-    step2: document.getElementById('step2-panel'),
-    step3: document.getElementById('step3-panel')
+    step2: document.getElementById('step2-panel')
 };
 
 // 初始化
@@ -99,9 +89,8 @@ function setupEventListeners() {
     // 步骤导航
     elements.nextStep1.addEventListener('click', () => goToStep(2));
     elements.prevStep2.addEventListener('click', () => goToStep(1));
-    elements.nextStep2.addEventListener('click', startMerge);
-    elements.restartBtn.addEventListener('click', restart);
-    elements.downloadBtn.addEventListener('click', downloadMergedPDF);
+    elements.nextStep2.addEventListener('click', mergeAndDownload);
+    elements.printfp.addEventListener('click', printCurrentPage);
 
     // 设置变更
     document.querySelectorAll('input[name="orientation"]').forEach(input => {
@@ -391,20 +380,40 @@ async function renderPreviewPage() {
     const pageWidth = isLandscape ? A4_HEIGHT : A4_WIDTH;
     const pageHeight = isLandscape ? A4_WIDTH : A4_HEIGHT;
     
-    // 设置Canvas尺寸（使用较高的缩放比例以获得清晰的预览）
-    const scale = 1.0;
-    canvas.width = pageWidth * scale;
-    canvas.height = pageHeight * scale;
+    // 获取设备像素比以提高分辨率
+    const dpr = window.devicePixelRatio || 1;
+    
+    // 设置Canvas内部分辨率（高分辨率）
+    canvas.width = pageWidth * dpr;
+    canvas.height = pageHeight * dpr;
+    
+    // 设置Canvas显示大小（CSS像素）
+    canvas.style.width = pageWidth + 'px';
+    canvas.style.height = pageHeight + 'px';
+    
+    // 缩放上下文以适应高分辨率
+    ctx.scale(dpr, dpr);
     
     // 白色背景
     ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, pageWidth, pageHeight);
     
-    const marginPt = margin * MM_TO_PT * scale;
-    const gapPt = gap * MM_TO_PT * scale;
+    // 绘制中间黑色虚线
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(0, pageHeight / 2);
+    ctx.lineTo(pageWidth, pageHeight / 2);
+    ctx.stroke();
     
-    const contentWidth = canvas.width - marginPt * 2;
-    const contentHeight = canvas.height - marginPt * 2;
+    ctx.setLineDash([]);
+    
+    const marginPt = margin * MM_TO_PT;
+    const gapPt = gap * MM_TO_PT;
+    
+    const contentWidth = pageWidth - marginPt * 2;
+    const contentHeight = pageHeight - marginPt * 2;
     const cellWidth = (contentWidth - gapPt * (cols - 1)) / cols;
     const cellHeight = (contentHeight - gapPt * (rows - 1)) / rows;
     
@@ -458,8 +467,9 @@ async function renderPreviewPage() {
             
             const col = i % cols;
             const row = Math.floor(i / cols);
+            // 使用与mergePDFs一致的坐标计算（从下往上）
             const x = marginPt + col * (cellWidth + gapPt);
-            const y = marginPt + row * (cellHeight + gapPt);
+            const y = pageHeight - marginPt - (row + 1) * cellHeight - row * gapPt;
             
             try {
                 // 获取或渲染页面图像
@@ -511,7 +521,7 @@ async function renderPreviewPage() {
             ctx.font = '12px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
-            ctx.fillText(`${state.currentPreviewPage + 1} / ${totalPagesNeeded}`, canvas.width / 2, canvas.height - 10);
+            ctx.fillText(`${state.currentPreviewPage + 1} / ${totalPagesNeeded}`, pageWidth / 2, pageHeight - 10);
         }
     } finally {
         elements.previewLoading.style.display = 'none';
@@ -622,17 +632,56 @@ function goToStep(step) {
 }
 
 // 开始合并
-async function startMerge() {
-    goToStep(3);
-    elements.processing.style.display = 'flex';
-    elements.resultSuccess.style.display = 'none';
-    
+// 合并并直接下载
+async function mergeAndDownload() {
+    if (state.files.length === 0) {
+        alert('请先上传发票文件');
+        return;
+    }
+
+    // 显示处理中的提示
+    const message = document.createElement('div');
+    message.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #fff;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 9999;
+        text-align: center;
+        font-size: 16px;
+        color: #333;
+    `;
+    message.innerHTML = '<div style="margin-bottom: 10px;"><div style="display: inline-block; width: 30px; height: 30px; border: 3px solid #f3f3f3; border-top: 3px solid #1677ff; border-radius: 50%; animation: spin 1s linear infinite;"></div></div><p>正在合并发票...</p>';
+    document.body.appendChild(message);
+
     try {
+        // 合并PDF
         await mergePDFs();
+
+        // 直接下载
+        if (state.mergedPdfBytes) {
+            const blob = new Blob([state.mergedPdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `发票合并_${formatDate(new Date())}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
     } catch (error) {
         console.error('合并失败:', error);
         alert('合并失败: ' + error.message);
-        goToStep(2);
+    } finally {
+        // 移除提示
+        if (message.parentNode) {
+            document.body.removeChild(message);
+        }
     }
 }
 
@@ -799,44 +848,77 @@ async function mergePDFs() {
     
     // 保存合并后的 PDF
     state.mergedPdfBytes = await mergedPdf.save();
-    
-    // 显示结果
-    elements.processing.style.display = 'none';
-    elements.resultSuccess.style.display = 'flex';
-    elements.resultInvoiceCount.textContent = allPages.length;
-    elements.resultPageCount.textContent = totalPagesNeeded;
 }
 
 // 更新进度
 function updateProgress(percent) {
-    elements.progressFill.style.width = percent + '%';
-    elements.progressText.textContent = Math.round(percent) + '%';
+    // 只有在进度条元素存在时才更新（第3步已移除，但保留此函数以兼容mergePDFs）
+    const progressFill = document.getElementById('progress-fill');
+    const progressText = document.getElementById('progress-text');
+    if (progressFill) progressFill.style.width = percent + '%';
+    if (progressText) progressText.textContent = Math.round(percent) + '%';
+}
+
+// 打印当前预览页面
+async function printCurrentPage() {
+    if (state.files.length === 0) {
+        alert('请先上传发票文件');
+        return;
+    }
+
+    try {
+        // 先合并PDF
+        await mergePDFs();
+        
+        if (!state.mergedPdfBytes) {
+            alert('合并PDF失败');
+            return;
+        }
+
+        // 创建PDF blob URL并在隐藏iframe中打开
+        const blob = new Blob([state.mergedPdfBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        
+        // 创建隐藏的iframe
+        let printFrame = document.getElementById('print-frame');
+        if (!printFrame) {
+            printFrame = document.createElement('iframe');
+            printFrame.id = 'print-frame';
+            printFrame.style.display = 'none';
+            document.body.appendChild(printFrame);
+        }
+        
+        // 在iframe中加载PDF
+        printFrame.src = url;
+        
+        // 等待iframe加载完成后打印
+        printFrame.onload = function() {
+            try {
+                const iframeWindow = printFrame.contentWindow;
+                iframeWindow.print();
+            } catch (err) {
+                console.error('iframe打印失败:', err);
+                window.print();
+            }
+        };
+        
+        // 清理：打印对话框关闭后释放资源
+        const afterPrintHandler = function() {
+            window.removeEventListener('afterprint', afterPrintHandler);
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+            }, 500);
+        };
+        
+        window.addEventListener('afterprint', afterPrintHandler);
+        
+    } catch (error) {
+        console.error('打印失败:', error);
+        alert('打印失败: ' + error.message);
+    }
 }
 
 // 下载合并后的 PDF
-function downloadMergedPDF() {
-    if (!state.mergedPdfBytes) return;
-    
-    const blob = new Blob([state.mergedPdfBytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `发票合并_${formatDate(new Date())}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-// 重新开始
-function restart() {
-    state.files = [];
-    state.mergedPdfBytes = null;
-    updateFileList();
-    updatePreview();
-    goToStep(1);
-}
-
 // 工具函数
 function formatFileSize(bytes) {
     if (bytes < 1024) return bytes + ' B';

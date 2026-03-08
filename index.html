@@ -24,17 +24,12 @@
         <div class="steps">
             <div class="step active" data-step="1">
                 <span class="step-number">1</span>
-                <span class="step-text">上传发票文件</span>
+                <span class="step-text">上传发票</span>
             </div>
             <div class="step-line"></div>
             <div class="step" data-step="2">
                 <span class="step-number">2</span>
-                <span class="step-text">设置合并方式</span>
-            </div>
-            <div class="step-line"></div>
-            <div class="step" data-step="3">
-                <span class="step-number">3</span>
-                <span class="step-text">下载合并后文件</span>
+                <span class="step-text">打印下载</span>
             </div>
         </div>
 
@@ -164,37 +159,7 @@
             <div class="panel-actions">
                 <button class="btn btn-secondary" id="prev-step2">上一步</button>
                 <button class="btn btn-primary" id="printfp">打印</button>
-                <button class="btn btn-primary" id="next-step2">合并下载</button>
-            </div>
-        </div>
-
-        <!-- 步骤3：下载 -->
-        <div class="panel step-panel" id="step3-panel" style="display: none;">
-            <div class="result-area">
-                <div class="processing" id="processing">
-                    <div class="spinner"></div>
-                    <p>正在合并发票，请稍候...</p>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progress-fill"></div>
-                    </div>
-                    <p class="progress-text" id="progress-text">0%</p>
-                </div>
-
-                <div class="result-success" id="result-success" style="display: none;">
-                    <div class="success-icon">
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="16 8 10 14 8 12"></polyline>
-                        </svg>
-                    </div>
-                    <h3>合并完成！</h3>
-                    <p class="result-info">共合并 <span id="result-invoice-count">0</span> 张发票，生成 <span id="result-page-count">0</span> 页</p>
-                    <button class="btn btn-primary btn-lg" id="download-btn">下载合并后的PDF</button>
-                </div>
-            </div>
-
-            <div class="panel-actions">
-                <button class="btn btn-secondary" id="restart-btn">重新开始</button>
+                <button class="btn btn-primary" id="next-step2">下载</button>
             </div>
         </div>
     </div>
